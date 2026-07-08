@@ -1,2 +1,2 @@
 # SmartChurn
-Customer Churn Prediction Pipeline
+An end-to-end production Machine Learning pipeline for customer churn prediction.

@@ -1,0 +1,37 @@
+# Core
+numpy
+pandas
+scikit-learn
+
+# API
+fastapi
+uvicorn[standard]
+pydantic
+
+# ML
+mlflow
+optuna
+xgboost
+lightgbm
+
+# Data Validation & Monitoring
+great-expectations
+evidently
+
+# Data Versioning
+dvc
+
+# Utilities
+pyyaml
+joblib
+python-dotenv
+
+# Testing
+pytest
+pytest-cov
+
+# Development
+black
+flake8
+mypy
+pre-commit
