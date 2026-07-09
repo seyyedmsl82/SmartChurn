@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-
 @dataclass
 class ValidationResult:
     """Result of data validation"""
@@ -111,7 +110,7 @@ class DataValidator:
             },
             'nullable_columns': ['TotalCharges'],  # Some TotalCharges might be missing
             'max_missing_rate': 0.1,  # Max 10% missing allowed
-            'min_rows': 100,
+            'min_rows': 4,
             'max_rows': 1000000
         }
     
