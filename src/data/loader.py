@@ -24,14 +24,45 @@ class DataLoader:
         Args:
             config_path: Path to configuration YAML file
         """
-        self.data_dir = 'data'
+        self.config = self._load_config(config_path) if config_path else {}
+        self.data_dir = Path(self.config.get('data_dir', 'data'))
         self.raw_data_dir = self.data_dir / 'raw'
         self.processed_data_dir = self.data_dir / 'processed'
         
         # Create directories if they don't exist
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
         self.processed_data_dir.mkdir(parents=True, exist_ok=True)
-
+    
+    def _load_config(self, config_path: str) -> dict:
+        """Load configuration from YAML file"""
+        with open(config_path, 'r') as f:
+            return yaml.safe_load(f)
+    
+    def load_from_csv(self, file_path: Union[str, Path]) -> pd.DataFrame:
+        """
+        Load data from CSV file
+        
+        Args:
+            file_path: Path to CSV file
+            
+        Returns:
+            DataFrame containing the data
+        """
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            raise FileNotFoundError(f"Data file not found: {file_path}")
+        
+        logger.info(f"Loading data from {file_path}")
+        
+        try:
+            df = pd.read_csv(file_path)
+            logger.info(f"Successfully loaded {len(df)} rows and {len(df.columns)} columns")
+            return df
+        except Exception as e:
+            logger.error(f"Failed to load CSV file: {e}")
+            raise
+    
     def load_from_url(self, url: str, save_local: bool = True) -> pd.DataFrame:
         """
         Load data from a URL (e.g., GitHub raw data)
