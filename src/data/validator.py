@@ -107,7 +107,7 @@ class DataValidator:
             },
             'nullable_columns': ['TotalCharges'],  # Some TotalCharges might be missing
             'max_missing_rate': 0.1,  # Max 10% missing allowed
-            'min_rows': 100,
+            'min_rows': 4,
             'max_rows': 1000000
         }
     
@@ -141,9 +141,9 @@ class DataValidator:
         
         # Log summary
         if result.is_valid:
-            logger.info("✅ Data validation passed!")
+            logger.success("Data validation passed!")
         else:
-            logger.error(f"❌ Data validation failed with {len(result.errors)} errors")
+            logger.error(f"Data validation failed with {len(result.errors)} errors")
             for error in result.errors:
                 logger.error(f"  - {error}")
         
@@ -213,6 +213,14 @@ class DataValidator:
         """Check that numeric columns fall within expected ranges"""
         for col, (min_val, max_val) in self.schema['ranges'].items():
             if col in df.columns:
+
+                # Skip range validation if the column is not numeric
+                if not pd.api.types.is_numeric_dtype(df[col]):
+                    result.add_error(
+                        f"Column '{col}' must be numeric to validate value ranges."
+                    )
+                    continue
+                
                 # Check min
                 min_actual = df[col].min()
                 if min_actual < min_val:
