@@ -74,7 +74,7 @@ class AdvancedFeatureEngineer(BaseEstimator, TransformerMixin):
             X['tenure_group'] = pd.cut(
                 X['tenure'],
                 bins=self.tenure_bins,
-                labels=[f'{bins[i]}-{bins[i+1]}' for i in range(len(self.tenure_bins)-1)]
+                labels=[f'{self.tenure_bins[i]}-{self.tenure_bins[i+1]}' for i in range(len(self.tenure_bins)-1)]
             )
             
             # Tenure risk score (new customers are higher risk)
