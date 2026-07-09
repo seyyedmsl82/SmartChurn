@@ -86,4 +86,4 @@ if __name__ == "__main__":
     with open('models/selected_features.json', 'w') as f:
         json.dump(selected, f)
     
-    logger.info("\n✅ Feature engineering tests completed!")
+    logger.success("\nFeature engineering tests completed!")

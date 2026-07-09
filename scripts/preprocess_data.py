@@ -311,7 +311,7 @@ def main():
         print(f"Processed data: {X_transformed.shape}")
         print(f"Features: {X_transformed.shape[1]}")
         print(f"Preprocessor: {pipeline.preprocessor_path}")
-        print(f"Validation: {'✅ PASSED' if pipeline.validation_result.is_valid else '⚠️ HAS WARNINGS'}")
+        print(f"Validation: {'PASSED' if pipeline.validation_result.is_valid else 'HAS WARNINGS'}")
         print(f"Output: {pipeline.processed_data_path}")
         print("=" * 60)
         
