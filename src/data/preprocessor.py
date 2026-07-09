@@ -31,11 +31,9 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
             X = pd.DataFrame(X)
         
         X = X.copy()
-        
-        # --- Fix data types first ---
+
         # Convert TotalCharges to numeric, handling ' ' or empty strings
         if 'TotalCharges' in X.columns:
-            # Convert to string first, then replace spaces/empty with NaN
             X['TotalCharges'] = pd.to_numeric(
                 X['TotalCharges'].astype(str).str.strip().replace('', np.nan),
                 errors='coerce'
