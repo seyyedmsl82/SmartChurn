@@ -1,0 +1,33 @@
+# Data configuration
+data_dir: data
+
+# Dataset information
+dataset:
+  name: "Telco Customer Churn"
+  source: "IBM"
+  url: "https://raw.githubusercontent.com/IBM/telco-customer-churn-on-icp/master/WA_Fn-UseC_-Telco-Customer-Churn.csv"
+  
+# Feature groups
+feature_groups:
+  numeric:
+    - tenure
+    - MonthlyCharges
+    - TotalCharges
+    - SeniorCitizen
+  categorical:
+    - gender
+    - Partner
+    - Dependents
+    - PhoneService
+    - MultipleLines
+    - InternetService
+    - OnlineSecurity
+    - OnlineBackup
+    - DeviceProtection
+    - TechSupport
+    - StreamingTV
+    - StreamingMovies
+    - Contract
+    - PaperlessBilling
+    - PaymentMethod
+  target: Churn
