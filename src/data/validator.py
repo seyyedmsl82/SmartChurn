@@ -266,4 +266,5 @@ class DataValidator:
             unique_count = df['customerID'].nunique()
             total_count = len(df)
             if unique_count < total_count:
-                result.add_error(f"customerID has {total_count - unique_count} duplicate values")
+                result.add_error(f"customerID has {total_count - unique_count} duplicate values")\
+                

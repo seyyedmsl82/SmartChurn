@@ -26,23 +26,48 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
     
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """Apply feature engineering"""
+        # Ensure X is a DataFrame
+        if not isinstance(X, pd.DataFrame):
+            X = pd.DataFrame(X)
+        
         X = X.copy()
+
+        # Convert TotalCharges to numeric, handling ' ' or empty strings
+        if 'TotalCharges' in X.columns:
+            X['TotalCharges'] = pd.to_numeric(
+                X['TotalCharges'].astype(str).str.strip().replace('', np.nan),
+                errors='coerce'
+            )
+        
+        # Ensure numeric columns are actually numeric
+        numeric_cols = ['tenure', 'MonthlyCharges', 'SeniorCitizen']
+        for col in numeric_cols:
+            if col in X.columns:
+                X[col] = pd.to_numeric(X[col], errors='coerce')
         
         # 1. Create tenure groups
-        X['tenure_group'] = pd.cut(
-            X['tenure'],
-            bins=[0, 6, 12, 24, 48, 72],
-            labels=['0-6', '6-12', '12-24', '24-48', '48-72']
-        )
+        if 'tenure' in X.columns:
+            try:
+                X['tenure_group'] = pd.cut(
+                    X['tenure'],
+                    bins=[0, 6, 12, 24, 48, 72],
+                    labels=['0-6', '6-12', '12-24', '24-48', '48-72']
+                )
+            except Exception as e:
+                logger.warning(f"Could not create tenure_group: {e}")
+                # Create a default tenure_group
+                X['tenure_group'] = '0-6'
         
         # 2. Create average monthly spend (if TotalCharges and tenure exist)
-        if 'TotalCharges' in X.columns and 'tenure' in X.columns:
+        if 'TotalCharges' in X.columns and 'tenure' in X.columns and 'MonthlyCharges' in X.columns:
             # Handle potential zero tenure
             X['avg_monthly_spend'] = np.where(
-                X['tenure'] > 0,
+                (X['tenure'] > 0) & (X['TotalCharges'].notna()),
                 X['TotalCharges'] / X['tenure'],
                 X['MonthlyCharges']
             )
+            # Handle cases where MonthlyCharges might be NaN
+            X['avg_monthly_spend'] = X['avg_monthly_spend'].fillna(X['MonthlyCharges'])
         
         # 3. Create service usage intensity
         service_cols = [
@@ -51,18 +76,27 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
             'TechSupport', 'StreamingTV', 'StreamingMovies'
         ]
         # Count number of services (excluding 'No' and 'No internet service')
-        if all(col in X.columns for col in service_cols):
-            X['service_count'] = X[service_cols].apply(
+        existing_service_cols = [col for col in service_cols if col in X.columns]
+        if existing_service_cols:
+            X['service_count'] = X[existing_service_cols].apply(
                 lambda row: sum(
                     1 for val in row 
                     if val not in ['No', 'No internet service']
                 ),
                 axis=1
             )
+        else:
+            X['service_count'] = 0
         
         # 4. Create senior citizen indicator (keep as is, but ensure it's numeric)
         if 'SeniorCitizen' in X.columns:
-            X['SeniorCitizen'] = X['SeniorCitizen'].astype(int)
+            X['SeniorCitizen'] = pd.to_numeric(X['SeniorCitizen'], errors='coerce').fillna(0).astype(int)
+        
+        # 5. Fill any remaining NaN values in numeric columns
+        numeric_engineered_cols = ['avg_monthly_spend', 'service_count', 'SeniorCitizen', 'tenure']
+        for col in numeric_engineered_cols:
+            if col in X.columns:
+                X[col] = X[col].fillna(0)
         
         return X
     
@@ -71,6 +105,7 @@ class FeatureEngineer(BaseEstimator, TransformerMixin):
         if self.feature_names_out_ is None:
             return ['tenure_group', 'avg_monthly_spend', 'service_count']
         return self.feature_names_out_
+
 
 class OutlierHandler(BaseEstimator, TransformerMixin):
     """
@@ -81,12 +116,28 @@ class OutlierHandler(BaseEstimator, TransformerMixin):
         self.multiplier = multiplier
         self.upper_bounds = {}
         self.lower_bounds = {}
+        self.numeric_cols = []
     
     def fit(self, X: pd.DataFrame, y=None):
         """Calculate bounds for each numeric column"""
-        numeric_cols = X.select_dtypes(include=[np.number]).columns
+        # Ensure X is a DataFrame
+        if not isinstance(X, pd.DataFrame):
+            X = pd.DataFrame(X)
         
-        for col in numeric_cols:
+        # Get numeric columns (excluding engineered categorical features)
+        self.numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
+        
+        # Remove columns that shouldn't be outlier-capped
+        exclude_cols = ['service_count', 'SeniorCitizen']
+        self.numeric_cols = [col for col in self.numeric_cols if col not in exclude_cols]
+        
+        for col in self.numeric_cols:
+            # Skip if column has all NaN or no variance
+            if X[col].isna().all() or X[col].std() == 0:
+                self.lower_bounds[col] = X[col].min()
+                self.upper_bounds[col] = X[col].max()
+                continue
+                
             Q1 = X[col].quantile(0.25)
             Q3 = X[col].quantile(0.75)
             IQR = Q3 - Q1
@@ -98,16 +149,20 @@ class OutlierHandler(BaseEstimator, TransformerMixin):
     
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
         """Cap outliers"""
+        # Ensure X is a DataFrame
+        if not isinstance(X, pd.DataFrame):
+            X = pd.DataFrame(X)
+        
         X = X.copy()
         
-        for col, (lower, upper) in zip(
-            self.lower_bounds.keys(),
-            zip(self.lower_bounds.values(), self.upper_bounds.values())
-        ):
+        for col in self.numeric_cols:
             if col in X.columns:
-                X[col] = X[col].clip(lower, upper)
+                # Only cap if bounds are valid
+                if col in self.lower_bounds and col in self.upper_bounds:
+                    X[col] = X[col].clip(self.lower_bounds[col], self.upper_bounds[col])
         
         return X
+
 
 class DataPreprocessor:
     """
@@ -144,18 +199,24 @@ class DataPreprocessor:
         self.handle_outliers = handle_outliers
         self.pipeline = None
         self.label_encoders = {}
+        self.feature_names_ = []
         
         self._build_pipeline()
     
     def _build_pipeline(self) -> None:
         """Build the full preprocessing pipeline"""
         
-        # Numeric transformer
-        numeric_transformer = Pipeline([
-            ('imputer', SimpleImputer(strategy='median')),
-            ('outlier_handler', OutlierHandler(multiplier=1.5)) if self.handle_outliers else ('passthrough', 'passthrough'),
-            ('scaler', StandardScaler())
-        ])
+        # Build numeric transformer
+        numeric_steps = [
+            ('imputer', SimpleImputer(strategy='median'))
+        ]
+        
+        if self.handle_outliers:
+            numeric_steps.append(('outlier_handler', OutlierHandler(multiplier=1.5)))
+        
+        numeric_steps.append(('scaler', StandardScaler()))
+        
+        numeric_transformer = Pipeline(numeric_steps)
         
         # Categorical transformer
         categorical_transformer = Pipeline([
@@ -172,7 +233,7 @@ class DataPreprocessor:
             remainder='drop'
         )
         
-        # Full pipeline with feature engineering
+        # Full pipeline: Feature engineering FIRST, then preprocessing
         self.pipeline = Pipeline([
             ('feature_engineer', FeatureEngineer()),
             ('preprocessor', self.preprocessor)
@@ -189,6 +250,9 @@ class DataPreprocessor:
         Returns:
             Transformed feature matrix
         """
+        # Make a copy to avoid modifying original
+        X = X.copy()
+        
         # Separate features and target if needed
         if self.target_col in X.columns:
             X = X.drop(columns=[self.target_col])
@@ -198,8 +262,14 @@ class DataPreprocessor:
             self._encode_target(y)
         
         logger.info(f"Fitting and transforming data with {len(X)} rows")
+        
+        # Fit and transform
         transformed = self.pipeline.fit_transform(X)
+        
         logger.info(f"Transformed data shape: {transformed.shape}")
+        
+        # Store feature names for later use
+        self._extract_feature_names()
         
         return transformed
     
@@ -213,10 +283,13 @@ class DataPreprocessor:
         Returns:
             Transformed feature matrix
         """
+        X = X.copy()
+        
         if self.target_col in X.columns:
             X = X.drop(columns=[self.target_col])
         
         logger.info(f"Transforming data with {len(X)} rows")
+        
         return self.pipeline.transform(X)
     
     def _encode_target(self, y: pd.Series) -> None:
@@ -226,10 +299,44 @@ class DataPreprocessor:
         self.label_encoders[self.target_col] = le
         logger.info(f"Target encoded with classes: {le.classes_}")
     
+    def _extract_feature_names(self) -> None:
+        """Extract feature names from the fitted pipeline"""
+        try:
+            # Try to get feature names from the preprocessor
+            if hasattr(self.preprocessor, 'get_feature_names_out'):
+                # Get numeric feature names
+                num_features = self.numeric_features.copy()
+                
+                # Add engineered feature names
+                engineered_features = ['tenure_group', 'avg_monthly_spend', 'service_count']
+                
+                # Get categorical feature names
+                if hasattr(self.preprocessor.named_transformers_['cat'], 'get_feature_names_out'):
+                    cat_features = self.preprocessor.named_transformers_['cat'].get_feature_names_out(
+                        self.categorical_features
+                    ).tolist()
+                else:
+                    cat_features = []
+                
+                # Combine all feature names
+                self.feature_names_ = engineered_features + num_features + cat_features
+                
+        except Exception as e:
+            logger.warning(f"Could not extract feature names: {e}")
+            self.feature_names_ = []
+    
     def get_feature_names(self) -> List[str]:
         """Get names of transformed features"""
+        if self.feature_names_:
+            return self.feature_names_
+        
+        # Fallback: generate generic names
         if hasattr(self.pipeline, 'get_feature_names_out'):
-            return self.pipeline.get_feature_names_out()
+            try:
+                return self.pipeline.get_feature_names_out().tolist()
+            except:
+                pass
+        
         return []
     
     def save(self, path: str) -> None:
