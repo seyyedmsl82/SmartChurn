@@ -69,11 +69,11 @@ class FeatureSelector:
     def _filter_method(self, X: pd.DataFrame, y: pd.Series) -> List[str]:
         """Filter method using statistical tests"""
         # Use both F-test and mutual information
-        selector_f = SelectKBest(f_classif, k=self.n_features or 20)
+        selector_f = SelectKBest(f_classif, k=self.n_features or min(20, X.shape[1]))
         selector_f.fit(X, y)
         f_scores = selector_f.scores_
         
-        selector_mi = SelectKBest(mutual_info_classif, k=self.n_features or 20)
+        selector_mi = SelectKBest(mutual_info_classif, k=self.n_features or min(20, X.shape[1]))
         selector_mi.fit(X, y)
         mi_scores = selector_mi.scores_
         
@@ -110,8 +110,8 @@ class FeatureSelector:
         rfecv = RFECV(
             estimator=estimator,
             step=1,
-            cv=5,
-            min_features_to_select=n_select,
+            cv=min(5, X.shape[0] // 10),  # Adjust CV based on data size
+            min_features_to_select=min(n_select, X.shape[1]),
             n_jobs=-1
         )
         rfecv.fit(X_scaled, y)
@@ -164,45 +164,98 @@ class FeatureSelector:
     def _combined_method(self, X: pd.DataFrame, y: pd.Series) -> List[str]:
         """Combine multiple feature selection methods"""
         # Get selections from each method
-        filter_selected = self._filter_method(X, y)
-        wrapper_selected = self._wrapper_method(X, y)
-        embedded_selected = self._embedded_method(X, y)
+        try:
+            filter_selected = self._filter_method(X, y)
+        except:
+            filter_selected = []
+            logger.warning("Filter method failed, continuing...")
         
-        # Find features selected by at least 2 methods
-        all_selected = set(filter_selected + wrapper_selected + embedded_selected)
+        try:
+            wrapper_selected = self._wrapper_method(X, y)
+        except:
+            wrapper_selected = []
+            logger.warning("Wrapper method failed, continuing...")
         
-        # Count selections
-        selection_counts = pd.Series(
-            filter_selected + wrapper_selected + embedded_selected
-        ).value_counts()
+        try:
+            embedded_selected = self._embedded_method(X, y)
+        except:
+            embedded_selected = []
+            logger.warning("Embedded method failed, continuing...")
         
-        # Features selected by at least 2 methods
-        consensus_features = selection_counts[selection_counts >= 2].index.tolist()
+        # If all methods failed, return top features from Random Forest
+        if not filter_selected and not wrapper_selected and not embedded_selected:
+            logger.warning("All selection methods failed. Using Random Forest importance.")
+            rf = RandomForestClassifier(n_estimators=100, random_state=self.random_state)
+            rf.fit(X, y)
+            importance = pd.DataFrame({
+                'feature': X.columns,
+                'importance': rf.feature_importances_
+            }).sort_values('importance', ascending=False)
+            
+            n_select = self.n_features or min(20, len(X.columns))
+            selected = importance.head(n_select)['feature'].tolist()
+            
+            self.feature_importance['combined'] = {
+                'method': 'fallback_random_forest',
+                'selected': selected
+            }
+            
+            return selected
         
+        # Combine selections
+        all_selected = list(set(filter_selected + wrapper_selected + embedded_selected))
+        
+        # If combined list is empty, use embedded selection
+        if not all_selected:
+            all_selected = embedded_selected if embedded_selected else filter_selected
+        
+        # Count selections for features that appear in multiple methods
+        selection_counts = {}
+        for feature in all_selected:
+            count = 0
+            if feature in filter_selected:
+                count += 1
+            if feature in wrapper_selected:
+                count += 1
+            if feature in embedded_selected:
+                count += 1
+            selection_counts[feature] = count
+        
+        # Sort by count (features selected by more methods first)
+        sorted_features = sorted(selection_counts.items(), key=lambda x: x[1], reverse=True)
+        
+        # Get consensus features (selected by at least 2 methods)
+        consensus_features = [f for f, c in sorted_features if c >= 2]
+        
+        # If no consensus, use all features sorted by selection count
         if not consensus_features:
-            # Fallback: use top features from each method
-            consensus_features = all_selected
+            consensus_features = [f for f, _ in sorted_features]
         
         # Limit to n_features
         if self.n_features and len(consensus_features) > self.n_features:
             # Use importance from embedded method for ranking
-            rf = RandomForestClassifier(
-                n_estimators=100,
-                random_state=self.random_state,
-                class_weight='balanced'
-            )
-            rf.fit(X[consensus_features], y)
-            
-            importance = pd.DataFrame({
-                'feature': consensus_features,
-                'importance': rf.feature_importances_
-            }).sort_values('importance', ascending=False)
-            
-            consensus_features = importance.head(self.n_features)['feature'].tolist()
+            try:
+                rf = RandomForestClassifier(
+                    n_estimators=100,
+                    random_state=self.random_state,
+                    class_weight='balanced'
+                )
+                rf.fit(X[consensus_features], y)
+                
+                importance = pd.DataFrame({
+                    'feature': consensus_features,
+                    'importance': rf.feature_importances_
+                }).sort_values('importance', ascending=False)
+                
+                consensus_features = importance.head(self.n_features)['feature'].tolist()
+            except:
+                # Fallback: take first n_features
+                consensus_features = consensus_features[:self.n_features]
         
         self.feature_importance['combined'] = {
-            'selection_counts': selection_counts.to_dict(),
-            'selected': consensus_features
+            'selection_counts': selection_counts,
+            'selected': consensus_features,
+            'all_candidates': all_selected
         }
         
         return consensus_features
@@ -222,14 +275,21 @@ class FeatureSelector:
         importance = pd.DataFrame({
             'feature': X.columns,
             'importance': rf.feature_importances_
-        }).sort_values('importance', ascending=True).tail(top_n)
+        }).sort_values('importance', ascending=False).head(top_n)
         
         # Plot
-        fig, ax = plt.subplots(figsize=(10, 8))
+        fig, ax = plt.subplots(figsize=(12, 8))
         ax.barh(importance['feature'], importance['importance'])
         ax.set_xlabel('Importance')
         ax.set_title(f'Top {top_n} Feature Importance')
         ax.grid(True, alpha=0.3)
+        
+        # Add value labels
+        for i, (_, row) in enumerate(importance.iterrows()):
+            ax.text(row['importance'] + 0.001, i, f'{row["importance"]:.3f}', 
+                   va='center', fontsize=9)
+        
+        plt.tight_layout()
         
         if save_path:
             plt.savefig(save_path, dpi=100, bbox_inches='tight')
@@ -239,7 +299,15 @@ class FeatureSelector:
     
     def analyze_correlations(self, X: pd.DataFrame, threshold: float = 0.8):
         """Analyze feature correlations and identify highly correlated pairs"""
-        corr_matrix = X.corr().abs()
+        # Select only numeric columns
+        numeric_cols = X.select_dtypes(include=[np.number]).columns
+        X_numeric = X[numeric_cols]
+        
+        if len(numeric_cols) < 2:
+            logger.warning("Not enough numeric columns for correlation analysis")
+            return []
+        
+        corr_matrix = X_numeric.corr().abs()
         
         # Find highly correlated pairs
         upper_tri = corr_matrix.where(
@@ -262,9 +330,20 @@ class FeatureSelector:
     def get_recommendations(self, X: pd.DataFrame, y: pd.Series) -> Dict[str, Any]:
         """Get feature selection recommendations"""
         # Run all selection methods
-        filter_selected = self._filter_method(X, y)
-        wrapper_selected = self._wrapper_method(X, y)
-        embedded_selected = self._embedded_method(X, y)
+        try:
+            filter_selected = self._filter_method(X, y)
+        except:
+            filter_selected = []
+        
+        try:
+            wrapper_selected = self._wrapper_method(X, y)
+        except:
+            wrapper_selected = []
+        
+        try:
+            embedded_selected = self._embedded_method(X, y)
+        except:
+            embedded_selected = []
         
         # Combined selection
         combined_selected = list(set(
@@ -273,7 +352,7 @@ class FeatureSelector:
         
         # Count frequencies
         all_selected = filter_selected + wrapper_selected + embedded_selected
-        freq = pd.Series(all_selected).value_counts()
+        freq = pd.Series(all_selected).value_counts() if all_selected else pd.Series()
         
         recommendations = {
             'filter_method': {
@@ -294,7 +373,7 @@ class FeatureSelector:
             },
             'selection_frequency': freq.head(20).to_dict(),
             'recommendation': combined_selected if len(combined_selected) <= 20 
-                            else freq.head(20).index.tolist()
+                            else freq.head(20).index.tolist() if not freq.empty else combined_selected[:20]
         }
         
         return recommendations
