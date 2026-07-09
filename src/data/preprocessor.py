@@ -185,15 +185,19 @@ class DataPreprocessor:
             target_col: Name of target column
             handle_outliers: Whether to handle outliers
         """
-        self.numeric_features = numeric_features or [
-            'tenure', 'MonthlyCharges', 'TotalCharges'
+        self.numeric_features = [
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges",
+            "avg_monthly_spend",
+            "service_count",
         ]
         self.categorical_features = categorical_features or [
             'gender', 'Partner', 'Dependents', 'PhoneService',
             'MultipleLines', 'InternetService', 'OnlineSecurity',
             'OnlineBackup', 'DeviceProtection', 'TechSupport',
             'StreamingTV', 'StreamingMovies', 'Contract',
-            'PaperlessBilling', 'PaymentMethod'
+            'PaperlessBilling', 'PaymentMethod', 'tenure_group',
         ]
         self.target_col = target_col
         self.handle_outliers = handle_outliers
@@ -307,9 +311,6 @@ class DataPreprocessor:
                 # Get numeric feature names
                 num_features = self.numeric_features.copy()
                 
-                # Add engineered feature names
-                engineered_features = ['tenure_group', 'avg_monthly_spend', 'service_count']
-                
                 # Get categorical feature names
                 if hasattr(self.preprocessor.named_transformers_['cat'], 'get_feature_names_out'):
                     cat_features = self.preprocessor.named_transformers_['cat'].get_feature_names_out(
@@ -319,7 +320,7 @@ class DataPreprocessor:
                     cat_features = []
                 
                 # Combine all feature names
-                self.feature_names_ = engineered_features + num_features + cat_features
+                self.feature_names_ = num_features + cat_features
                 
         except Exception as e:
             logger.warning(f"Could not extract feature names: {e}")
