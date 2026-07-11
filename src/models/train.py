@@ -32,8 +32,9 @@ class ModelTrainer:
     """Handle model training with experiment tracking"""
     
     def __init__(self, 
-                 config_path: Optional[str] = None,
-                 experiment_name: str = "churn_prediction"):
+        config_path: Optional[str] = None,
+        experiment_name: str = "churn_prediction"
+    ):
         """
         Initialize model trainer
         
@@ -42,7 +43,7 @@ class ModelTrainer:
             experiment_name: Name for MLflow experiment
         """
         self.config = self._load_config(config_path) if config_path else {}
-        self.experiment_name = experiment_name
+        self.experiment_name = self.config.get('experiment_name', experiment_name)
         self.models = {}
         self.best_model = None
         self.best_params = {}
@@ -111,12 +112,13 @@ class ModelTrainer:
         return models
     
     def train_single_model(self, 
-                          model: Any, 
-                          X_train: pd.DataFrame, 
-                          y_train: pd.Series,
-                          X_val: pd.DataFrame,
-                          y_val: pd.Series,
-                          model_name: str) -> Dict[str, float]:
+        model: Any, 
+        X_train: pd.DataFrame, 
+        y_train: pd.Series,
+        X_val: pd.DataFrame,
+        y_val: pd.Series,
+        model_name: str
+    ) -> Dict[str, float]:
         """
         Train a single model and evaluate
         
@@ -154,10 +156,11 @@ class ModelTrainer:
         return metrics
     
     def train_all_models(self,
-                        X_train: pd.DataFrame,
-                        y_train: pd.Series,
-                        X_val: pd.DataFrame,
-                        y_val: pd.Series) -> Dict[str, Dict]:
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        X_val: pd.DataFrame,
+        y_val: pd.Series
+    ) -> Dict[str, Dict]:
         """Train all configured models"""
         
         models = self.get_models()
@@ -179,10 +182,11 @@ class ModelTrainer:
         return results
     
     def cross_validate_model(self,
-                            model: Any,
-                            X: pd.DataFrame,
-                            y: pd.Series,
-                            cv: int = 5) -> Dict[str, float]:
+        model: Any,
+        X: pd.DataFrame,
+        y: pd.Series,
+        cv: int = 5
+    ) -> Dict[str, float]:
         """Perform cross-validation for a model"""
         
         logger.info(f"Cross-validating {model.__class__.__name__}")
@@ -237,10 +241,11 @@ class ModelTrainer:
         return model
     
     def hyperparameter_tuning(self,
-                             X_train: pd.DataFrame,
-                             y_train: pd.Series,
-                             model_type: str = 'xgboost',
-                             n_trials: int = 30) -> Dict[str, Any]:
+        X_train: pd.DataFrame,
+        y_train: pd.Series,
+        model_type: str = 'xgboost',
+        n_trials: int = 30
+    ) -> Dict[str, Any]:
         """
         Perform hyperparameter tuning using Optuna
         
@@ -330,8 +335,13 @@ class ModelTrainer:
         
         return best_params
     
-    def save_model(self, model: Any, model_name: str, save_path: str = 'models'):
+    def save_model(self, 
+        model: Any, 
+        model_name: str, 
+        save_path: str = 'models'
+    ) -> Path:
         """Save model to disk"""
+        save_path = self.config.get('save_path', save_path)
         save_path = Path(save_path)
         save_path.mkdir(parents=True, exist_ok=True)
         
