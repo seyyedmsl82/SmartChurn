@@ -1,13 +1,14 @@
 """
 Data ingestion module for loading customer churn data
 """
-import os
-import pandas as pd
-import yaml
 from pathlib import Path
 from typing import Optional, Union
-from loguru import logger
+
+import pandas as pd
+import yaml
 from dotenv import load_dotenv
+from loguru import logger
+
 
 # Load environment variables
 load_dotenv()

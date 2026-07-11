@@ -1,7 +1,13 @@
-import pytest
+import sys
+from pathlib import Path
+
+# Add src to path
+sys.path.append(str(Path(__file__).parent.parent))
+
 import pandas as pd
-import numpy as np
-from src.data.validator import DataValidator, ValidationResult
+
+from src.data.validator import DataValidator
+
 
 class TestDataValidator:
     """Test suite for DataValidator"""

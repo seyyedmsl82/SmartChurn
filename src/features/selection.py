@@ -1,12 +1,11 @@
 """
 Feature selection module for churn prediction
 """
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from loguru import logger
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import (RFECV, SelectFromModel,
