@@ -1,17 +1,18 @@
 """
 Data preprocessing pipeline for customer churn prediction
 """
-import pandas as pd
-import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
-from sklearn.impute import SimpleImputer
-from typing import List, Optional, Tuple
-from loguru import logger
 import pickle
 from pathlib import Path
+from typing import List, Optional
+
+import numpy as np
+import pandas as pd
+from loguru import logger
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 
 
 class FeatureEngineer(BaseEstimator, TransformerMixin):
@@ -168,7 +169,6 @@ class DataPreprocessor:
     """
     Main preprocessing pipeline for customer churn data
     """
-    
     def __init__(
         self,
         numeric_features: Optional[List[str]] = None,
@@ -186,14 +186,18 @@ class DataPreprocessor:
             handle_outliers: Whether to handle outliers
         """
         self.numeric_features = numeric_features or [
-            'tenure', 'MonthlyCharges', 'TotalCharges'
+            "tenure",
+            "MonthlyCharges",
+            "TotalCharges",
+            "avg_monthly_spend",
+            "service_count",
         ]
         self.categorical_features = categorical_features or [
             'gender', 'Partner', 'Dependents', 'PhoneService',
             'MultipleLines', 'InternetService', 'OnlineSecurity',
             'OnlineBackup', 'DeviceProtection', 'TechSupport',
             'StreamingTV', 'StreamingMovies', 'Contract',
-            'PaperlessBilling', 'PaymentMethod'
+            'PaperlessBilling', 'PaymentMethod', 'tenure_group',
         ]
         self.target_col = target_col
         self.handle_outliers = handle_outliers
@@ -239,7 +243,10 @@ class DataPreprocessor:
             ('preprocessor', self.preprocessor)
         ])
     
-    def fit_transform(self, X: pd.DataFrame, y: Optional[pd.Series] = None) -> np.ndarray:
+    def fit_transform(self, 
+        X: pd.DataFrame, 
+        y: Optional[pd.Series] = None
+    ) -> np.ndarray:
         """
         Fit and transform the data
         
@@ -307,9 +314,6 @@ class DataPreprocessor:
                 # Get numeric feature names
                 num_features = self.numeric_features.copy()
                 
-                # Add engineered feature names
-                engineered_features = ['tenure_group', 'avg_monthly_spend', 'service_count']
-                
                 # Get categorical feature names
                 if hasattr(self.preprocessor.named_transformers_['cat'], 'get_feature_names_out'):
                     cat_features = self.preprocessor.named_transformers_['cat'].get_feature_names_out(
@@ -319,7 +323,7 @@ class DataPreprocessor:
                     cat_features = []
                 
                 # Combine all feature names
-                self.feature_names_ = engineered_features + num_features + cat_features
+                self.feature_names_ = num_features + cat_features
                 
         except Exception as e:
             logger.warning(f"Could not extract feature names: {e}")
@@ -370,3 +374,48 @@ class DataPreprocessor:
         
         logger.info(f"Preprocessor loaded from {path}")
         return preprocessor
+
+
+def handle_missing_values(X: pd.DataFrame, strategy: str = 'median') -> pd.DataFrame:
+    """
+    Handle missing values in features
+    
+    Args:
+        X: Feature DataFrame
+        strategy: Imputation strategy ('mean', 'median', 'most_frequent', 'constant')
+        
+    Returns:
+        DataFrame with missing values handled
+    """
+    # Check for missing values
+    missing_cols = X.columns[X.isnull().any()].tolist()
+    
+    if not missing_cols:
+        logger.info("   No missing values found")
+        return X
+    
+    logger.info(f"   Found missing values in {len(missing_cols)} columns: {missing_cols[:5]}...")
+    
+    # Separate numeric and categorical columns
+    numeric_cols = X.select_dtypes(include=[np.number]).columns
+    categorical_cols = X.select_dtypes(include=['object', 'category']).columns
+    
+    X_clean = X.copy()
+    
+    # Impute numeric columns
+    if len(numeric_cols) > 0:
+        numeric_missing = [col for col in numeric_cols if col in missing_cols]
+        if numeric_missing:
+            logger.info(f"   Imputing {len(numeric_missing)} numeric columns with {strategy}")
+            imputer = SimpleImputer(strategy=strategy)
+            X_clean[numeric_cols] = imputer.fit_transform(X_clean[numeric_cols])
+    
+    # Impute categorical columns
+    if len(categorical_cols) > 0:
+        categorical_missing = [col for col in categorical_cols if col in missing_cols]
+        if categorical_missing:
+            logger.info(f"   Imputing {len(categorical_missing)} categorical columns with 'most_frequent'")
+            imputer = SimpleImputer(strategy='most_frequent')
+            X_clean[categorical_cols] = imputer.fit_transform(X_clean[categorical_cols])
+    
+    return X_clean

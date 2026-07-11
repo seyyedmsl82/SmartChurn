@@ -1,7 +1,13 @@
-import pytest
-import pandas as pd
+import sys
 from pathlib import Path
+
+# Add src to path
+sys.path.append(str(Path(__file__).parent.parent))
+
+import pandas as pd
+
 from src.data.loader import DataLoader
+
 
 class TestDataLoader:
     """Test suite for DataLoader"""
