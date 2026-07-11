@@ -1,3 +1,4 @@
+import sys
 import os
 import json
 from pathlib import Path
@@ -131,3 +132,19 @@ def run_feature_selection(X_engineered: pd.DataFrame, y: np.ndarray,
     X_selected = X_engineered[available_features]
     
     return selected_features, X_selected
+
+def validate_required_files() -> None:
+    """Ensure all required artifacts exist."""
+
+    required_files = {
+        Path("models/preprocessor.pkl"): "python scripts/preprocess_data.py",
+        Path("models/selected_features.json"): "python scripts/train_pipeline.py",
+    }
+
+    for path, command in required_files.items():
+        if not path.exists():
+            logger.error(f"Missing required artifact: {path}")
+            logger.error(f"Generate it by running:\n    {command}")
+            sys.exit(1)
+
+    logger.info("All required artifacts found.")
