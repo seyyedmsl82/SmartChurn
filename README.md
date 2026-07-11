@@ -149,11 +149,11 @@ Versioned model storage.
 ### 7. Model Evaluation (`src/evaluation/`)
 Comprehensive model assessment with business impact analysis.
 
-Evaluation features:
+#### Evaluation features:
 
-Business Metrics: Churn detection rate, false alarm rate, cost analysis ($500 per missed churner, $50 per false alarm)
+* **Business Metrics:** Churn detection rate, false alarm rate, cost analysis ($500 per missed churner, $50 per false alarm)
 
-Threshold Optimization: Finds optimal probability threshold (best: 0.45) balancing precision and recall
+* **Threshold Optimization:** Finds optimal probability threshold (best: 0.45) balancing precision and recall
 
 ## Results & Performance
 
