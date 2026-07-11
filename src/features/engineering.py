@@ -2,7 +2,7 @@
 Advanced feature engineering for customer churn prediction
 """
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -11,15 +11,17 @@ from sklearn.base import BaseEstimator, TransformerMixin
 
 warnings.filterwarnings('ignore')
 
+
 class AdvancedFeatureEngineer(BaseEstimator, TransformerMixin):
     """
     Advanced feature engineering with business logic
     """
     
     def __init__(self, 
-                 tenure_bins: Optional[List[int]] = None,
-                 create_interaction_features: bool = True,
-                 create_aggregate_features: bool = True):
+        tenure_bins: Optional[List[int]] = None,
+        create_interaction_features: bool = True,
+        create_aggregate_features: bool = True
+    ):
         """
         Initialize feature engineer
         
@@ -74,7 +76,8 @@ class AdvancedFeatureEngineer(BaseEstimator, TransformerMixin):
             X['tenure_group'] = pd.cut(
                 X['tenure'],
                 bins=self.tenure_bins,
-                labels=[f'{self.tenure_bins[i]}-{self.tenure_bins[i+1]}' for i in range(len(self.tenure_bins)-1)]
+                labels=[f'{self.tenure_bins[i]}-{self.tenure_bins[i+1]}' 
+                        for i in range(len(self.tenure_bins)-1)]
             )
             
             # Tenure risk score (new customers are higher risk)
