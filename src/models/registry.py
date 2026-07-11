@@ -62,13 +62,14 @@ class ModelRegistry:
             json.dump(self.metadata, f, indent=2, default=str)
     
     def register_model(self, 
-                       model: Any,
-                       model_name: str,
-                       metrics: Dict[str, float],
-                       description: Optional[str] = None,
-                       tags: Optional[List[str]] = None,
-                       version: Optional[str] = None,
-                       stage: str = 'staging') -> str:
+        model: Any,
+        model_name: str,
+        metrics: Dict[str, float],
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        version: Optional[str] = None,
+        stage: str = 'staging'
+    ) -> str:
         """
         Register a new model in the registry
         
@@ -150,7 +151,8 @@ class ModelRegistry:
             Version string (e.g., 'xgboost_v1.0.0')
         """
         # Count existing versions of this model
-        versions = [m['version'] for m in self.metadata['models'] if m['model_name'] == model_name]
+        versions = [m['version'] for m in self.metadata['models']
+                    if m['model_name'] == model_name]
         
         if not versions:
             # First version
@@ -196,7 +198,10 @@ class ModelRegistry:
             return params
         return {}
     
-    def load_model(self, version: Optional[str] = None, stage: Optional[str] = None) -> Tuple[Any, Dict]:
+    def load_model(self, 
+        version: Optional[str] = None, 
+        stage: Optional[str] = None
+    ) -> Tuple[Any, Dict]:
         """
         Load a model from the registry
         
@@ -261,7 +266,10 @@ class ModelRegistry:
                 return model
         return None
     
-    def list_models(self, model_name: Optional[str] = None, stage: Optional[str] = None) -> List[Dict]:
+    def list_models(self, 
+        model_name: Optional[str] = None, 
+        stage: Optional[str] = None
+    ) -> List[Dict]:
         """
         List all models in the registry
         
@@ -282,7 +290,10 @@ class ModelRegistry:
         
         return models
     
-    def promote_model(self, version: str, target_stage: str = 'production') -> None:
+    def promote_model(self, 
+        version: str, 
+        target_stage: str = 'production'
+    ) -> None:
         """
         Promote a model to a different stage
         
@@ -536,7 +547,10 @@ class ModelRegistry:
         
         print("\n" + "=" * 70)
     
-    def export_registry_report(self, output_path: str = 'reports/model_registry_report.md') -> None:
+    def export_registry_report(
+        self, 
+        output_path: str = 'reports/model_registry_report.md'
+    ) -> None:
         """
         Export a markdown report of the registry
         
