@@ -1,3 +1,5 @@
+import sys
+import os
 import json
 from pathlib import Path
 
@@ -8,6 +10,22 @@ from sklearn.preprocessing import LabelEncoder
 from src.data.preprocessor import handle_missing_values
 from src.features.selection import FeatureSelector, map_selected_features
 
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+
+        if isinstance(obj, np.floating):
+            return float(obj)
+
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+
+        return super().default(obj)
 
 def encode_target(y: pd.Series) -> tuple:
     """
@@ -103,6 +121,7 @@ def run_feature_selection(X_engineered: pd.DataFrame, y: np.ndarray,
     logger.info(f"   Mapped to {len(selected_features)} original features")
     
     # Save selected features
+    os.makedirs('models', exist_ok=True)
     with open('models/selected_features.json', 'w') as f:
         json.dump(selected_features, f)
     logger.info(f"   Selected {len(selected_features)} features")
@@ -113,3 +132,19 @@ def run_feature_selection(X_engineered: pd.DataFrame, y: np.ndarray,
     X_selected = X_engineered[available_features]
     
     return selected_features, X_selected
+
+def validate_required_files() -> None:
+    """Ensure all required artifacts exist."""
+
+    required_files = {
+        Path("models/preprocessor.pkl"): "python scripts/preprocess_data.py",
+        Path("models/selected_features.json"): "python scripts/train_pipeline.py",
+    }
+
+    for path, command in required_files.items():
+        if not path.exists():
+            logger.error(f"Missing required artifact: {path}")
+            logger.error(f"Generate it by running:\n    {command}")
+            sys.exit(1)
+
+    logger.info("All required artifacts found.")

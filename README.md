@@ -13,6 +13,7 @@ SmartChurn is an end-to-end machine learning system that:
 - **Trains** multiple models with imbalance handling
 - **Tracks** experiments with MLflow
 - **Versions** models for production deployment
+- **Evaluates** a certain model by model's tag
 
 ### Key Results
 
@@ -46,6 +47,9 @@ python scripts/download_dataset.py
 # Run the full training pipeline
 python scripts/train_pipeline.py
 
+# Run evaluation pipeline
+python scripts/evaluate_model.py
+
 # Test everything
 make test
 ```
@@ -69,7 +73,7 @@ make all           # Full pipeline (data → train → test)
 |--------|--------------|-------|
 | `scripts/download_dataset.py` | Downloads IBM Telco dataset from GitHub | `python scripts/download_dataset.py` |
 | `scripts/train_pipeline.py` | Complete training pipeline with feature selection | `python scripts/train_pipeline.py [--no-feature-selection] [--n-features 30]` |
-| `scripts/test_pipeline.py` | Quick test of the entire pipeline | `python scripts/test_pipeline.py` |
+| `scripts/evaluate_model.py` | Quick evaluation test of models | `python scripts/evaluate_model.py` |
 
 ### Training Script Options
 
@@ -141,6 +145,15 @@ Training with imbalance handling and MLflow tracking.
 
 ### 6. Model Registry (`src/models/registry.py`)
 Versioned model storage.
+
+### 7. Model Evaluation (`src/evaluation/`)
+Comprehensive model assessment with business impact analysis.
+
+#### Evaluation features:
+
+* **Business Metrics:** Churn detection rate, false alarm rate, cost analysis ($500 per missed churner, $50 per false alarm)
+
+* **Threshold Optimization:** Finds optimal probability threshold (best: 0.45) balancing precision and recall
 
 ## Results & Performance
 
