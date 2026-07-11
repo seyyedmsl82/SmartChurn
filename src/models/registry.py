@@ -262,8 +262,11 @@ class ModelRegistry:
             Dictionary with model information, or None if not found
         """
         for model in self.metadata['models']:
+            print(model['version'])
             if model['version'] == version:
                 return model
+            if version == 'latest':
+                return self.metadata['models'][-1]
         return None
     
     def list_models(self, 

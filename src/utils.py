@@ -1,3 +1,4 @@
+import os
 import json
 from pathlib import Path
 
@@ -8,6 +9,22 @@ from sklearn.preprocessing import LabelEncoder
 from src.data.preprocessor import handle_missing_values
 from src.features.selection import FeatureSelector, map_selected_features
 
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+
+        if isinstance(obj, np.floating):
+            return float(obj)
+
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+
+        return super().default(obj)
 
 def encode_target(y: pd.Series) -> tuple:
     """
@@ -103,6 +120,7 @@ def run_feature_selection(X_engineered: pd.DataFrame, y: np.ndarray,
     logger.info(f"   Mapped to {len(selected_features)} original features")
     
     # Save selected features
+    os.makedirs('models', exist_ok=True)
     with open('models/selected_features.json', 'w') as f:
         json.dump(selected_features, f)
     logger.info(f"   Selected {len(selected_features)} features")
