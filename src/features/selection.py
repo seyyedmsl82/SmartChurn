@@ -9,7 +9,7 @@ import pandas as pd
 import seaborn as sns
 from loguru import logger
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.feature_selection import (RFE, RFECV, SelectFromModel,
+from sklearn.feature_selection import (RFECV, SelectFromModel,
                                        SelectKBest, f_classif,
                                        mutual_info_classif)
 from sklearn.linear_model import LogisticRegression
@@ -22,9 +22,10 @@ class FeatureSelector:
     """
     
     def __init__(self, 
-                 n_features: Optional[int] = None,
-                 method: str = 'combined',
-                 random_state: int = 42):
+        n_features: Optional[int] = None,
+        method: str = 'combined',
+        random_state: int = 42
+    ):
         """
         Initialize feature selector
         
@@ -260,8 +261,11 @@ class FeatureSelector:
         
         return consensus_features
     
-    def plot_feature_importance(self, X: pd.DataFrame, y: pd.Series, 
-                                top_n: int = 20, save_path: Optional[str] = None):
+    def plot_feature_importance(
+        self, 
+        X: pd.DataFrame, y: pd.Series, 
+        top_n: int = 20, save_path: Optional[str] = None
+    ):
         """Plot feature importance"""
         # Train a Random Forest for importance
         rf = RandomForestClassifier(
@@ -377,3 +381,53 @@ class FeatureSelector:
         }
         
         return recommendations
+
+
+def map_selected_features(selected_encoded: list, original_columns: list) -> list:
+    """
+    Map selected encoded feature names back to original feature names
+    
+    Args:
+        selected_encoded: List of encoded feature names from selection
+        original_columns: List of original column names
+        
+    Returns:
+        List of original feature names that were selected
+    """
+    # Clean up encoded names to get original names
+    mapped_features = []
+    
+    for feature in selected_encoded:
+        # Check if this feature exists in original columns
+        if feature in original_columns:
+            mapped_features.append(feature)
+        else:
+            # Try to find the original feature by checking prefixes
+            found = False
+            for orig_col in original_columns:
+                # Check if the encoded feature starts with the original column name
+                if feature.startswith(orig_col + '_'):
+                    if orig_col not in mapped_features:
+                        mapped_features.append(orig_col)
+                        found = True
+                        break
+                # Check for exact match without underscore
+                elif feature == orig_col:
+                    if orig_col not in mapped_features:
+                        mapped_features.append(orig_col)
+                        found = True
+                        break
+            
+            if not found:
+                # If not found, try to match by removing common suffixes
+                for orig_col in original_columns:
+                    if orig_col in feature or feature in orig_col:
+                        if orig_col not in mapped_features:
+                            mapped_features.append(orig_col)
+                            found = True
+                            break
+                
+                if not found:
+                    logger.warning(f"   Could not map feature: {feature}")
+    
+    return mapped_features
