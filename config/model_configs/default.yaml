@@ -1,0 +1,38 @@
+# Default model configuration
+
+random_state: 42
+
+models:
+  logistic_regression:
+    enabled: true
+    C: 1.0
+    max_iter: 1000
+  
+  random_forest:
+    enabled: true
+    n_estimators: 100
+    max_depth: 10
+    min_samples_split: 5
+    min_samples_leaf: 3
+  
+  xgboost:
+    enabled: true
+    n_estimators: 100
+    learning_rate: 0.1
+    max_depth: 6
+    scale_pos_weight: 5
+  
+  lightgbm:
+    enabled: true
+    n_estimators: 100
+    learning_rate: 0.1
+    num_leaves: 31
+
+hyperparameter_tuning:
+  enabled: true
+  n_trials: 30
+  model_type: xgboost
+
+cross_validation:
+  n_folds: 5
+  scoring: f1_weighted

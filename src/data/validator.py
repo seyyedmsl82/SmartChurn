@@ -1,13 +1,14 @@
 """
 Data validation module for ensuring data quality and schema compliance
 """
-from pathlib import Path
-import yaml
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
+import yaml
 from loguru import logger
+
 
 @dataclass
 class ValidationResult:
@@ -30,7 +31,11 @@ class DataValidator:
     Validates data quality and schema compliance
     """
     
-    def __init__(self, schema_path: Optional[str] = None, strict: bool = False):
+    def __init__(
+        self, 
+        schema_path: Optional[str] = None, 
+        strict: bool = False
+    ):
         """
         Initialize the validator with a schema
         
@@ -157,7 +162,11 @@ class DataValidator:
         
         return result
     
-    def _validate_required_columns(self, df: pd.DataFrame, result: ValidationResult) -> None:
+    def _validate_required_columns(
+        self, 
+        df: pd.DataFrame, 
+        result: ValidationResult
+    ) -> None:
         """Check that all required columns are present"""
         missing = set(self.schema['required_columns']) - set(df.columns)
         if missing:
@@ -207,7 +216,11 @@ class DataValidator:
         if n_rows > self.schema['max_rows']:
             result.add_warning(f"Dataset has {n_rows} rows, which exceeds the expected maximum of {self.schema['max_rows']}")
     
-    def _validate_missing_values(self, df: pd.DataFrame, result: ValidationResult) -> None:
+    def _validate_missing_values(
+        self, 
+        df: pd.DataFrame, 
+        result: ValidationResult
+    ) -> None:
         """Check for missing values"""
         missing_counts = df.isnull().sum()
         
@@ -235,7 +248,11 @@ class DataValidator:
                 if unexpected:
                     result.add_warning(f"Column '{col}' has unexpected values: {unexpected}")
     
-    def _validate_numeric_ranges(self, df: pd.DataFrame, result: ValidationResult) -> None:
+    def _validate_numeric_ranges(
+        self, 
+        df: pd.DataFrame, 
+        result: ValidationResult
+    ) -> None:
         """Check that numeric columns fall within expected ranges"""
         for col, (min_val, max_val) in self.schema['ranges'].items():
             if col not in df.columns:
