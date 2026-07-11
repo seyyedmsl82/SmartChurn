@@ -6,11 +6,9 @@ import pickle
 import warnings
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import mlflow
-import mlflow.sklearn
-import mlflow.xgboost
 import numpy as np
 import optuna
 import pandas as pd
@@ -18,15 +16,14 @@ import xgboost as xgb
 import yaml
 from lightgbm import LGBMClassifier
 from loguru import logger
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (accuracy_score, average_precision_score,
-                             confusion_matrix, f1_score, precision_score,
-                             recall_score, roc_auc_score)
-from sklearn.model_selection import (StratifiedKFold, cross_val_score,
-                                     train_test_split)
+from sklearn.metrics import (accuracy_score, average_precision_score, f1_score,
+                             precision_score, recall_score, roc_auc_score)
+from sklearn.model_selection import StratifiedKFold, cross_val_score
 
 warnings.filterwarnings('ignore')
+
 
 class ModelTrainer:
     """Handle model training with experiment tracking"""

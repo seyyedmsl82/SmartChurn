@@ -5,10 +5,10 @@ import json
 import pickle
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, List, Tuple
-from loguru import logger
+from typing import Any, Dict, List, Optional, Tuple
+
 import pandas as pd
-import numpy as np
+from loguru import logger
 
 
 class ModelRegistry:
