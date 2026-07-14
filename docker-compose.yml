@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: smartchurn-api
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - DEBUG=False
+      - HOST=0.0.0.0
+      - PORT=8000
+      - MODEL_PATH=/app/models/registry
+      - PREPROCESSOR_PATH=/app/models/preprocessor.pkl
+      - FEATURES_PATH=/app/models/selected_features.json
+      - LOG_LEVEL=INFO
+      - LOG_FILE=/app/logs/api.log
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./reports:/app/reports
+    restart: unless-stopped
+    networks:
+      - smartchurn-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MLflow tracking server
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    container_name: smartchurn-mlflow
+    ports:
+      - "5001:5000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://localhost:5001
+    volumes:
+      - ./mlflow:/mlflow
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri /mlflow
+    networks:
+      - smartchurn-network
+    restart: unless-stopped
+
+networks:
+  smartchurn-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
