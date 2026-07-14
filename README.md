@@ -27,7 +27,34 @@ SmartChurn is an end-to-end machine learning system that:
 
 ## Quick Start
 
-### Installation
+### Docker Deployment (Recommended)
+
+The fastest way to get started is with Docker Compose:
+
+```bash
+# Clone repository
+git clone git@github.com:seyyedmsl82/SmartChurn.git
+cd SmartChurn
+
+# Create required directories
+mkdir -p models data logs reports mlflow models/registry
+
+# Build and start all services
+docker-compose up -d
+
+# Check if services are running
+docker-compose ps
+
+# View logs
+docker-compose logs -f api
+```
+
+This starts:
+- **API Service** on `http://localhost:8000`
+- **MLflow Tracking** on `http://localhost:5001`
+- **Automatic health checks** and restart policies
+
+### Local Development Setup
 
 ```bash
 # Clone repository
@@ -55,12 +82,84 @@ python scripts/train_pipeline.py
 python scripts/evaluate_model.py
 
 # Start the API service
-python src/api/app
+python src/api/app.py
 ```
 
-### API Service
+## Docker Setup
 
-The API service is now available with the following endpoints:
+### Dockerfile Features
+
+The multi-stage Dockerfile provides:
+
+- **Optimized Build**: Uses multi-stage builds for smaller production images
+- **Security**: Runs as non-root user (appuser:1000)
+- **Health Checks**: Automatic monitoring of API health
+- **Production Ready**: Configured with environment variables for different deployments
+
+```dockerfile
+# Multi-stage build for production
+FROM python:3.10-slim AS builder  # Build stage with compilers
+FROM python:3.10-slim              # Production stage without build tools
+```
+
+### Docker Compose Services
+
+| Service | Container Name | Port | Description |
+|---------|---------------|------|-------------|
+| API | smartchurn-api | 8000 | FastAPI application with ML predictions |
+| MLflow | smartchurn-mlflow | 5001 | Experiment tracking and model registry |
+
+### Docker Commands
+
+```bash
+# Build and start all services
+docker-compose up -d
+
+# Rebuild without cache
+docker-compose build --no-cache
+
+# View logs for specific service
+docker-compose logs -f api
+docker-compose logs -f mlflow
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (clean slate)
+docker-compose down -v
+
+# Execute commands inside container
+docker-compose exec api bash
+docker-compose exec api python -c "import src; print('OK')"
+
+# Restart a specific service
+docker-compose restart api
+
+# Check health status
+docker inspect smartchurn-api --format='{{.State.Health.Status}}'
+```
+
+### Persistent Data Volumes
+
+The docker-compose mounts the following volumes for data persistence:
+
+| Host Path | Container Path | Purpose |
+|-----------|---------------|---------|
+| `./models` | `/app/models` | Trained models and registry |
+| `./data` | `/app/data` | Datasets and processed data |
+| `./logs` | `/app/logs` | Application logs |
+| `./reports` | `/app/reports` | Evaluation reports |
+| `./mlflow` | `/mlflow` | MLflow experiment data |
+
+## API Service
+
+### Interactive Documentation
+
+Access automatic Swagger/OpenAPI docs at:
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
+
+### API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -68,7 +167,8 @@ The API service is now available with the following endpoints:
 | POST | `/api/v1/predict/batch` | Batch predictions (max 1000) |
 | GET | `/api/v1/health` | Service health check |
 | GET | `/api/v1/metrics` | Model performance metrics |
-| GET | `/docs` | Interactive API documentation|
+| GET | `/docs` | Interactive API documentation |
+| GET | `/redoc` | ReDoc API documentation |
 
 **Example Request:**
 
@@ -147,24 +247,6 @@ curl -X POST http://localhost:8000/api/v1/predict/single \
 - **Middleware** - Rate limiting, logging, CORS
 - **Documentation** - Automatic Swagger/OpenAPI docs
 
-## Deployment
-
-### Docker Deployment
-
-```bash
-# Build the image
-docker build -t smartchurn-api:latest .
-
-# Run with docker-compose
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f api
-
-# Stop services
-docker-compose down
-```
-
 ## Configuration
 
 ### API Configuration (`.env`)
@@ -202,6 +284,141 @@ hyperparameter_tuning:
   enabled: true
   n_trials: 30
   model_type: xgboost
+```
+
+## MLflow Tracking
+
+MLflow is pre-configured in the docker-compose for experiment tracking:
+
+- **Tracking UI**: `http://localhost:5001`
+- **Backend Store**: Persistent volume at `./mlflow`
+- **Auto-logging**: Configured in training scripts
+
+### MLflow Commands
+
+```bash
+# Access MLflow UI
+open http://localhost:5001
+
+# List experiments (from inside container)
+docker-compose exec api mlflow experiments list
+
+# Download model artifacts
+docker-compose exec api mlflow artifacts download --run-id <run_id>
+```
+
+## Monitoring & Health Checks
+
+### API Health Check
+
+```bash
+# Check API health
+curl http://localhost:8000/api/v1/health
+
+# Check Docker health status
+docker inspect smartchurn-api --format='{{.State.Health.Status}}'
+
+# View health check logs
+docker inspect smartchurn-api --format='{{.State.Health.Log}}'
+```
+
+### Service Status
+
+```bash
+# Check all services
+docker-compose ps
+
+# View resource usage
+docker stats
+
+# Check logs for errors
+docker-compose logs --tail=50 api | grep ERROR
+```
+
+## Development Workflow
+
+### With Docker (Recommended for Production)
+
+```bash
+# Build and run with volumes for development
+docker-compose up --build
+
+# Test changes by rebuilding
+docker-compose build --no-cache api
+docker-compose up -d api
+```
+
+### Local Development
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Install in development mode
+pip install -e .
+
+# Run tests
+pytest tests/
+
+# Run linter
+flake8 src/
+black src/  # Auto-format
+
+# Start API with hot-reload
+uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Troubleshooting
+
+### Docker Build Issues
+
+**WSL Timeout (Windows):**
+```bash
+# Reset WSL
+wsl --shutdown
+# Restart Docker Desktop
+```
+
+**Permission Issues:**
+```bash
+# Ensure directories have correct permissions
+mkdir -p models data logs reports mlflow
+chmod 755 models data logs reports mlflow
+```
+
+**Port Conflicts:**
+```bash
+# Check if ports are in use
+netstat -ano | findstr :8000
+netstat -ano | findstr :5001
+
+# Change ports in docker-compose.yml if needed
+```
+
+### Common Issues
+
+**ModuleNotFoundError:**
+```bash
+# Rebuild with clear cache
+docker-compose build --no-cache api
+# Check installed packages
+docker-compose exec api pip list
+```
+
+**MLflow Connection Failed:**
+```bash
+# Check MLflow is running
+docker-compose ps mlflow
+# Test connection
+docker-compose exec api curl http://mlflow:5000
+```
+
+**Volume Mount Issues:**
+```bash
+# Verify volumes are mounted
+docker inspect smartchurn-api --format='{{.Mounts}}'
+# Check directory permissions on host
+ls -la models/ data/ logs/
 ```
 
 ## Contributing
