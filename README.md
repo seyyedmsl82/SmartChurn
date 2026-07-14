@@ -13,7 +13,8 @@ SmartChurn is an end-to-end machine learning system that:
 - **Trains** multiple models with imbalance handling
 - **Tracks** experiments with MLflow
 - **Versions** models for production deployment
-- **Evaluates** a certain model by model's tag
+- **Serves** predictions via production-grade REST API
+- **Monitors** data drift and model performance
 
 ### Key Results
 
@@ -44,27 +45,71 @@ pip install -r requirements/requirements.txt
 # Download the dataset
 python scripts/download_dataset.py
 
+# Preprocess the dataset and save the preprocessor
+python scripts/preprocess_data.py
+
 # Run the full training pipeline
 python scripts/train_pipeline.py
 
 # Run evaluation pipeline
 python scripts/evaluate_model.py
 
-# Test everything
-make test
+# Start the API service
+python src/api/app
 ```
 
-### Quick Commands with Make
+### API Service
+
+The API service is now available with the following endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/predict/single` | Single customer prediction |
+| POST | `/api/v1/predict/batch` | Batch predictions (max 1000) |
+| GET | `/api/v1/health` | Service health check |
+| GET | `/api/v1/metrics` | Model performance metrics |
+| GET | `/docs` | Interactive API documentation|
+
+**Example Request:**
 
 ```bash
-make install       # Install all dependencies
-make data          # Download dataset
-make preprocess    # Run preprocessing only
-make train         # Train models
-make test          # Run all tests
-make lint          # Run linters
-make clean         # Clean temporary files
-make all           # Full pipeline (data → train → test)
+curl -X POST http://localhost:8000/api/v1/predict/single \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer": {
+      "gender": "Female",
+      "SeniorCitizen": 0,
+      "Partner": "Yes",
+      "Dependents": "No",
+      "tenure": 24,
+      "Contract": "Month-to-month",
+      "PaperlessBilling": "Yes",
+      "PaymentMethod": "Electronic check",
+      "MonthlyCharges": 75.0,
+      "TotalCharges": 1800.0,
+      "PhoneService": "Yes",
+      "MultipleLines": "No",
+      "InternetService": "DSL",
+      "OnlineSecurity": "No",
+      "OnlineBackup": "No",
+      "DeviceProtection": "No",
+      "TechSupport": "No",
+      "StreamingTV": "No",
+      "StreamingMovies": "No"
+    }
+  }'
+```
+
+**Example Response:**
+
+```json
+{
+  "prediction": 0,
+  "probability": 0.23,
+  "churn_risk": "Low",
+  "model_version": "RandomForest_v1.0.0",
+  "timestamp": "2024-01-15T10:30:00"
+}
 ```
 
 ## Convenience Scripts
@@ -74,139 +119,110 @@ make all           # Full pipeline (data → train → test)
 | `scripts/download_dataset.py` | Downloads IBM Telco dataset from GitHub | `python scripts/download_dataset.py` |
 | `scripts/train_pipeline.py` | Complete training pipeline with feature selection | `python scripts/train_pipeline.py [--no-feature-selection] [--n-features 30]` |
 | `scripts/evaluate_model.py` | Quick evaluation test of models | `python scripts/evaluate_model.py` |
-
-### Training Script Options
-
-```bash
-# Skip feature selection (use all features)
-python scripts/train_pipeline.py --no-feature-selection
-
-# Use existing selected features (from previous run)
-python scripts/train_pipeline.py --use-existing-selection
-
-# Specify number of features to select
-python scripts/train_pipeline.py --n-features 25
-
-# Choose selection method
-python scripts/train_pipeline.py --selection-method embedded
-
-# Change imputation strategy
-python scripts/train_pipeline.py --impute-strategy median
-
-# Use custom config
-python scripts/train_pipeline.py --config config/model_configs/default.yaml
-```
+| `scripts/test_api.sh` | Test API endpoints | `./scripts/test_api.sh` |
+| `scripts/deploy.sh` | Deploy with Docker | `./scripts/deploy.sh` |
 
 ## What's Been Built
 
-### 1. Data Ingestion (`src/data/loader.py`)
-Load data from multiple sources with local caching.
+### Data Layer (`src/data/`)
+- **Loader** - CSV, URL, and local caching support
+- **Validator** - Schema validation, data quality checks
+- **Preprocessor** - Pipeline with imputation, scaling, encoding
 
-```python
-from src.data.loader import DataLoader
+### Feature Layer (`src/features/`)
+- **Engineering** - Tenure groups, avg spend, service intensity, risk indicators
+- **Selection** - Filter, wrapper, and embedded methods
 
-loader = DataLoader()
+### Model Layer (`src/models/`)
+- **Train** - Multiple models with imbalance handling
+- **Registry** - Versioned model storage with metadata
 
-# Load from URL
-df = loader.load_from_url("https://raw.githubusercontent.com/...")
+### Evaluation Layer (`src/evaluation/`)
+- **Metrics** - Business metrics with cost analysis
 
-# Load from CSV
-df = loader.load_from_csv("data/raw/file.csv")
-
-# Get dataset info
-info = loader.get_dataset_info(df)
-```
-
-### 2. Data Validation (`src/data/validator.py`)
-Comprehensive data quality checks.
-
-**Validations performed:**
-- Required columns existence
-- Data type matching
-- Missing value thresholds
-- Categorical value validation
-- Numeric range validation
-- Unique ID validation
-
-### 3. Preprocessing Pipeline (`src/data/preprocessor.py`)
-Feature engineering with sklearn Pipeline integration.
-
-**Features created:**
-- Tenure groups (0-6, 6-12, 12-24, 24-48, 48-72 months)
-- Average monthly spend (TotalCharges / tenure)
-- Service usage intensity (count of subscribed services)
-- Senior citizen indicator
-
-### 4. Feature Selection (`src/features/selection.py`)
-Multiple methods for optimal feature selection.
-
-### 5. Model Training (`src/models/train.py`)
-Training with imbalance handling and MLflow tracking.
-
-### 6. Model Registry (`src/models/registry.py`)
-Versioned model storage.
-
-### 7. Model Evaluation (`src/evaluation/`)
-Comprehensive model assessment with business impact analysis.
-
-#### Evaluation features:
-
-* **Business Metrics:** Churn detection rate, false alarm rate, cost analysis ($500 per missed churner, $50 per false alarm)
-
-* **Threshold Optimization:** Finds optimal probability threshold (best: 0.45) balancing precision and recall
-
-## Results & Performance
-
-### Current Best Model: RandomForest
-
-| Metric | Value |
-|--------|-------|
-| **F1 Score** | **0.7838** |
-| ROC-AUC | 0.8405 |
-| Accuracy | ~84% |
-| Optimal Threshold | 0.45 |
-
+### API Layer (`src/api/`)
+- **REST API** - FastAPI with prediction, batch, and explanation endpoints
+- **Validation** - Pydantic schemas for request/response
+- **Services** - Prediction service with model lifecycle management
+- **Middleware** - Rate limiting, logging, CORS
+- **Documentation** - Automatic Swagger/OpenAPI docs
 
 ## Deployment
 
-### Export Model for Production
+### Docker Deployment
 
-```python
-from src.models.registry import ModelRegistry
-import pickle
+```bash
+# Build the image
+docker build -t smartchurn-api:latest .
 
-registry = ModelRegistry()
+# Run with docker-compose
+docker-compose up -d
 
-# Get latest model
-model = registry.load_model()
+# Check logs
+docker-compose logs -f api
 
-# Or specific version
-model = registry.load_model(version='v1.0.0')
-
-# Export for API service
-with open('models/production_model.pkl', 'wb') as f:
-    pickle.dump(model, f)
+# Stop services
+docker-compose down
 ```
 
-### FastAPI Integration (Coming Soon)
+## Configuration
 
-```python
-from fastapi import FastAPI
-from src.data.preprocessor import DataPreprocessor
-from src.models.registry import ModelRegistry
+### API Configuration (`.env`)
 
-app = FastAPI()
-model = ModelRegistry().load_model()
-preprocessor = DataPreprocessor.load('models/preprocessor.pkl')
-
-@app.post("/predict")
-def predict(features: dict):
-    X = pd.DataFrame([features])
-    X_processed = preprocessor.transform(X)
-    prediction = model.predict(X_processed)
-    return {"churn_prediction": bool(prediction[0])}
+```env
+APP_ENV=development
+DEBUG=True
+HOST=0.0.0.0
+PORT=8000
+WORKERS=1
+MODEL_PATH=models/registry
+PREPROCESSOR_PATH=models/preprocessor.pkl
+FEATURES_PATH=models/selected_features.json
+RATE_LIMIT_REQUESTS=100
+RATE_LIMIT_PERIOD=60
 ```
 
-**Maintainer:** [S. R. Moslemi](https://github.com/seyyedmsl82)
+### Model Configuration
 
+```yaml
+# config/model_configs/default.yaml
+models:
+  logistic_regression:
+    enabled: true
+    C: 1.0
+  random_forest:
+    enabled: true
+    n_estimators: 100
+    max_depth: 10
+  xgboost:
+    enabled: true
+    n_estimators: 100
+    learning_rate: 0.1
+hyperparameter_tuning:
+  enabled: true
+  n_trials: 30
+  model_type: xgboost
+```
+
+## Contributing
+
+1. Create a feature branch from `develop`
+2. Implement your changes with tests
+3. Run `make lint` and `make test`
+4. Create a pull request to `develop`
+
+---
+
+**Maintainer:** [S. R. Moslemi](https://github.com/seyyedmsl82)  
 **Last Updated:** July 2026
+
+---
+
+## Detailed Documentation
+
+For more detailed information about specific components, see the documentation in the `docs/` directory:
+
+- [Data Ingestion](docs/data_ingestion.md) - Data loading and caching
+- [Feature Engineering](docs/feature_engineering/) - Feature creation and selection
+- [Model Training](docs/evaluation.md) - Evaluation pipeline and Evaluation Features
+- [API Service](docs/api_service.md) - API endpoints and usage
